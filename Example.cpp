@@ -11,10 +11,8 @@
 #include "LinK3D_Extractor.h"
 #include "BoW3D.h"
 
-
 using namespace std;
 using namespace BoW3D;
-
 
 //Parameters of LinK3D
 int nScans = 64; //Number of LiDAR scan lines
@@ -35,6 +33,7 @@ vector<float> read_lidar_data(const std::string lidar_data_path)
     lidar_data_file.open(lidar_data_path, std::ifstream::in | std::ifstream::binary);
     if(!lidar_data_file)
     {
+        cout << "Cannot open file: " << lidar_data_path << endl;
         cout << "Read End..." << endl;
         exit(-1);
     }
@@ -48,17 +47,19 @@ vector<float> read_lidar_data(const std::string lidar_data_path)
     return lidar_data_buffer;
 }
 
-
 int main(int argc, char** argv)
 {
     ros::init(argc, argv, "BoW3D");
     ros::NodeHandle nh;  
 
-
-    /*Please replace the dataset folder path with the path in your computer. KITTI's 00, 02, 05, 06, 07, 08 have loops*/
+    /*修改为你的数据集路径*/
     string dataset_folder;
-    dataset_folder = "/home/cuiyunge/dataset/velodyne/"; //The last '/' should be added 
-
+    string sequence = "00"; // 可以改为 00, 02, 05, 06, 07, 08
+    
+    // 修改为你的KITTI数据集路径
+    dataset_folder = "/home/" + string(getenv("USER")) + "/pan1/Data/KITTI/" + sequence + "/velodyne/";
+    
+    cout << "Dataset folder: " << dataset_folder << endl;
 
     BoW3D::LinK3D_Extractor* pLinK3dExtractor = new BoW3D::LinK3D_Extractor(nScans, scanPeriod, minimumRange, distanceTh, matchTh); 
     BoW3D::BoW3D* pBoW3D = new BoW3D::BoW3D(pLinK3dExtractor, thr, thf, num_add_retrieve_features);
@@ -70,6 +71,16 @@ int main(int argc, char** argv)
     {              
         std::stringstream lidar_data_path;
         lidar_data_path << dataset_folder << std::setfill('0') << std::setw(6) << cloudInd << ".bin";
+        
+        // 检查文件是否存在
+        ifstream file_check(lidar_data_path.str());
+        if (!file_check.good()) {
+            cout << "File does not exist: " << lidar_data_path.str() << endl;
+            cout << "Processed " << cloudInd << " frames. Exiting..." << endl;
+            break;
+        }
+        file_check.close();
+        
         vector<float> lidar_data = read_lidar_data(lidar_data_path.str());
         
         pcl::PointCloud<pcl::PointXYZ>::Ptr current_cloud(new pcl::PointCloud<pcl::PointXYZ>());
@@ -110,13 +121,13 @@ int main(int argc, char** argv)
             {
                 cout << "-------------------------" << endl;
                 cout << "Detection Time: " << time << "s" << endl;
-                cout << "Frame" << pCurrentFrame->mnId << " Has No Loop..." << endl;
+                cout << "Frame " << pCurrentFrame->mnId << " Has No Loop..." << endl;
             }
             else
             {
                 cout << "--------------------------------------" << endl;
                 cout << "Detection Time: " << time << "s" << endl;
-                cout << "Frame" << pCurrentFrame->mnId << " Has Loop Frame" << loopFrameId << endl;
+                cout << "Frame " << pCurrentFrame->mnId << " Has Loop Frame " << loopFrameId << endl;
                 
                 cout << "Loop Relative R: " << endl;
                 cout << loopRelR << endl;
@@ -126,7 +137,7 @@ int main(int argc, char** argv)
             }
         }                       
         
-        cloudInd ++;
+        cloudInd++;
 
         ros::spinOnce();
         LiDAR_rate.sleep();
@@ -134,4 +145,3 @@ int main(int argc, char** argv)
 
     return 0;
 }
-
